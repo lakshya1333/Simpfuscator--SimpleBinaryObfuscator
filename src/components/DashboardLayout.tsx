@@ -1,13 +1,10 @@
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 import { Moon, Sun, Menu, X } from "lucide-react";
+import { Outlet } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import Sidebar from "./Sidebar";
 
-interface DashboardLayoutProps {
-  children: ReactNode;
-}
-
-const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+const DashboardLayout = () => {
   const [darkMode, setDarkMode] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -52,7 +49,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
         <main className="flex-1 p-6 cyber-grid overflow-auto">
           <div className="max-w-7xl mx-auto">
-            {children}
+            <Outlet />
           </div>
         </main>
       </div>
