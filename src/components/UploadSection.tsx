@@ -9,9 +9,10 @@ interface UploadedFile {
   name: string;
   size: number;
   type: string;
+  file: File; // Add the actual File object
 }
 
-const UploadSection = ({ onFileUploaded }: { onFileUploaded?: (file: UploadedFile) => void }) => {
+const UploadSection = ({ onFileUploaded }: { onFileUploaded?: (file: File) => void }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -60,6 +61,7 @@ const UploadSection = ({ onFileUploaded }: { onFileUploaded?: (file: UploadedFil
       name: file.name,
       size: file.size,
       type: file.type,
+      file: file, // Store the actual File object
     };
 
     setUploadedFile(fileData);
@@ -76,7 +78,7 @@ const UploadSection = ({ onFileUploaded }: { onFileUploaded?: (file: UploadedFil
             title: "Upload successful",
             description: `${file.name} has been uploaded successfully`,
           });
-          onFileUploaded?.(fileData);
+          onFileUploaded?.(file); // Pass the actual File object
           return 100;
         }
         return prev + 10;
