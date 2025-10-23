@@ -1,10 +1,61 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Activity, Shield, Zap } from "lucide-react";
+import { Activity, Shield, Zap, Play, Settings2 } from "lucide-react";
 import MetricsCard from "@/components/MetricsCard";
 import ActivityLog from "@/components/ActivityLog";
+import UploadSection from "@/components/UploadSection";
+import AnalysisDashboard from "@/components/AnalysisDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
+  const [uploadedFile, setUploadedFile] = useState<any>(null);
+  const [isObfuscating, setIsObfuscating] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [options, setOptions] = useState({
+    controlFlow: true,
+    stringEncryption: true,
+    antiDebug: true,
+    apiHiding: false,
+  });
+  const { toast } = useToast();
+
+  const startObfuscation = () => {
+    if (!uploadedFile) {
+      toast({
+        title: "No file uploaded",
+        description: "Please upload a file first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsObfuscating(true);
+    setIsComplete(false);
+    setProgress(0);
+
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsObfuscating(false);
+          setIsComplete(true);
+          toast({
+            title: "Obfuscation complete!",
+            description: "Your binary has been successfully obfuscated",
+          });
+          return 100;
+        }
+        return prev + 2;
+      });
+    }, 100);
+  };
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -13,14 +64,14 @@ const Dashboard = () => {
         className="space-y-2"
       >
         <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Dashboard
+          Simpfuscator Dashboard
         </h1>
         <p className="text-muted-foreground">
-          Overview of your binary obfuscation operations
+          Upload and obfuscate your Windows PE binaries
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <MetricsCard
           title="Total Obfuscations"
           value="127"
@@ -44,79 +95,156 @@ const Dashboard = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>Quick Stats</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center py-3 border-b border-border">
-                <span className="text-muted-foreground">Files Processed Today</span>
-                <span className="font-bold text-primary">12</span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b border-border">
-                <span className="text-muted-foreground">Average Obfuscation</span>
-                <span className="font-bold text-secondary">84%</span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b border-border">
-                <span className="text-muted-foreground">Total Data Secured</span>
-                <span className="font-bold">156.8 GB</span>
-              </div>
-              <div className="flex justify-between items-center py-3">
-                <span className="text-muted-foreground">Success Rate</span>
-                <span className="font-bold text-secondary">99.2%</span>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+      {/* Upload Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <UploadSection onFileUploaded={setUploadedFile} />
 
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>System Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">CPU Usage</span>
-                  <span className="text-primary font-medium">34%</span>
+          {uploadedFile && !isObfuscating && !isComplete && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Button
+                onClick={startObfuscation}
+                className="w-full h-14 text-lg bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-primary-foreground font-semibold"
+              >
+                <Play className="h-5 w-5 mr-2" />
+                Start Obfuscation
+              </Button>
+            </motion.div>
+          )}
+
+          {isObfuscating && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <Card className="glass-card border-primary/50">
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">Obfuscating...</h3>
+                      <span className="text-primary font-bold">{progress}%</span>
+                    </div>
+                    <Progress value={progress} className="h-3" />
+                    <p className="text-sm text-muted-foreground">
+                      {progress < 30 && "Analyzing binary structure..."}
+                      {progress >= 30 && progress < 60 && "Applying control flow obfuscation..."}
+                      {progress >= 60 && progress < 90 && "Encrypting constants and strings..."}
+                      {progress >= 90 && "Finalizing obfuscation..."}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings2 className="h-5 w-5 text-primary" />
+                  Obfuscation Options
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="control-flow" className="cursor-pointer">
+                    Control Flow
+                  </Label>
+                  <Switch
+                    id="control-flow"
+                    checked={options.controlFlow}
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, controlFlow: checked })
+                    }
+                  />
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-primary to-secondary w-[34%]" />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="string-encryption" className="cursor-pointer">
+                    String Encryption
+                  </Label>
+                  <Switch
+                    id="string-encryption"
+                    checked={options.stringEncryption}
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, stringEncryption: checked })
+                    }
+                  />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Memory Usage</span>
-                  <span className="text-secondary font-medium">58%</span>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="anti-debug" className="cursor-pointer">
+                    Anti-Debug
+                  </Label>
+                  <Switch
+                    id="anti-debug"
+                    checked={options.antiDebug}
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, antiDebug: checked })
+                    }
+                  />
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-secondary to-primary w-[58%]" />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="api-hiding" className="cursor-pointer">
+                    API Hiding
+                  </Label>
+                  <Switch
+                    id="api-hiding"
+                    checked={options.apiHiding}
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, apiHiding: checked })
+                    }
+                  />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Storage</span>
-                  <span className="font-medium">23.4 GB / 100 GB</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-primary to-secondary w-[23%]" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="glass-card border-primary/30">
+              <CardHeader>
+                <CardTitle className="text-sm">Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>• Supported formats: .exe, .dll</p>
+                <p>• Maximum file size: 100MB</p>
+                <p>• Average processing time: 2-5 seconds</p>
+                <p>• Encryption: AES-256-GCM</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </div>
 
+      {/* Analysis Results Section - Only show after obfuscation complete */}
+      {isComplete && (
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-4"
+        >
+          <div className="border-t border-border pt-6">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
+              Analysis Results
+            </h2>
+          </div>
+          <AnalysisDashboard />
+        </motion.div>
+      )}
+
+      {/* Activity Log - Always visible */}
       <ActivityLog />
     </div>
   );

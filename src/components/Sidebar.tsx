@@ -1,4 +1,4 @@
-import { Home, Upload, BarChart3, Settings } from "lucide-react";
+import { Home, Settings } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -9,8 +9,6 @@ interface SidebarProps {
 const Sidebar = ({ isOpen }: SidebarProps) => {
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
-    { icon: Upload, label: "Upload", path: "/upload" },
-    { icon: BarChart3, label: "Analysis", path: "/analysis" },
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
 
