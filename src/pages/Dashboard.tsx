@@ -46,6 +46,7 @@ const Dashboard = () => {
   const encryptionOptions = [
     { value: "xor", label: "XOR Encryption", description: "Fast bitwise operation encryption" },
     { value: "rsa", label: "RSA Encryption", description: "Public-key cryptography algorithm" },
+    { value: "aes", label: "AES Encryption", description: "Advanced Encryption Standard (AES-128 CBC)" },
   ];
 
   const startObfuscation = async () => {
@@ -466,6 +467,17 @@ const Dashboard = () => {
 
             <Card className="glass-card">
               <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Block Size</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-semibold">
+                  {obfuscationData.encryption_details?.block_size || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
                 <CardTitle className="text-sm text-muted-foreground">Loader Type</CardTitle>
               </CardHeader>
               <CardContent>
@@ -561,7 +573,7 @@ const Dashboard = () => {
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>• Supported format: ELF binaries (Linux executables)</p>
             <p>• Maximum file size: 100MB</p>
-            <p>• Encryption: XOR or RSA</p>
+            <p>• Encryption: XOR, RSA, or AES</p>
             <p>• Digital signature: RSA-PSS 2048-bit</p>
             <p>• Loader: Self-extracting with tmpfs</p>
           </CardContent>

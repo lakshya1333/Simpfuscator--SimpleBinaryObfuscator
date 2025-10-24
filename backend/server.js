@@ -164,7 +164,7 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
       if (!publicKey) console.log('  - Missing public key');
     }
 
-    const validEncryptionTypes = ['xor', 'rsa'];
+    const validEncryptionTypes = ['xor', 'rsa', 'aes'];
     if (!validEncryptionTypes.includes(encryptionType.toLowerCase())) {
       return res.status(400).json({ 
         error: 'Invalid encryption type',

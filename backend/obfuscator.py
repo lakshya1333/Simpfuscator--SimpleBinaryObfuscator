@@ -78,7 +78,7 @@ def bytes_to_c_array(b: bytes, per_line: int = 12) -> str:
     inner = ",\n    ".join(parts) if parts else ""
     return "{\n    " + inner + "\n}"
 
-symbols = ['xor', 'rsa'] # fuckass
+symbols = ['xor', 'rsa', 'aes']
 class Obfuscator:
 
     def __init__(self, filename):
@@ -91,7 +91,7 @@ class Obfuscator:
         except lief.bad_file as e:
             print(f"Error parsing ELF file: {e}")
             sys.exit(1)
-        self.encryptions = [encrypt_xor, encrypt_rsa]
+        self.encryptions = [encrypt_xor, encrypt_rsa, encrypt_aes]
 
     def obfuscate(self, option, output_path=None):
         print(f"[+] Starting obfuscation for '{self.filename}'")
@@ -108,8 +108,21 @@ class Obfuscator:
 
         func_sign = {
             1 : f'decrypt_xor(elf_bytes, elf_len, {key[0]})',
-            2 : f'decrypt_rsa(elf_bytes, elf_len, {key[0]}, {key[1]})'
+            2 : f'decrypt_rsa(elf_bytes, elf_len, {key[0]}, {key[1]}, {key[2]})',  # d, n, block_size
+            3 : f'decrypt_aes(elf_bytes, elf_len, aes_key, aes_iv)'  # AES key and IV
         }
+        
+        # For RSA and AES, the decrypted length should be the original length
+        # For XOR, encrypted and decrypted lengths are the same
+        decrypted_len = len(raw) if option in [2, 3] else len(enc)
+        
+        # Generate AES key and IV arrays if AES is selected
+        aes_key_array = ""
+        aes_iv_array = ""
+        if option == 3:
+            aes_key_array = f"static unsigned char aes_key[] = {bytes_to_c_array(key[0])};"
+            aes_iv_array = f"static unsigned char aes_iv[] = {bytes_to_c_array(key[1])};"
+        
         c_code = f'''#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
@@ -124,8 +137,13 @@ class Obfuscator:
 
 {xor_dec_func}
 {rsa_dec_func}
+{aes_dec_func}
 
 size_t elf_len = {len(enc)};
+size_t decrypted_len = {decrypted_len};
+
+{aes_key_array}
+{aes_iv_array}
 
 static unsigned char elf_bytes[] = {bytes_to_c_array(enc)};
 
@@ -139,8 +157,8 @@ int main() {{
         return 4;
     }}
     size_t written = 0;
-    while (written < elf_len) {{
-        ssize_t w = write(fd, elf_bytes + written, elf_len - written);
+    while (written < decrypted_len) {{
+        ssize_t w = write(fd, elf_bytes + written, decrypted_len - written);
         if (w < 0) {{
             if (errno == EINTR) continue;
             perror("write");
@@ -240,32 +258,51 @@ int main() {{
                     "key_size": "8-bit",
                     "key_value": f"0x{key[0]:02x}",
                     "rounds": 1,
-                    "mode": "Stream Cipher"
+                    "mode": "Stream Cipher",
+                    "block_size": "1 byte"
                 }
-            else:  # RSA
+                key_info = f"Key: 0x{key[0]:02x}"
+            elif option == 2:  # RSA
+                block_size = key[2] if len(key) > 2 else 1
+                n_bits = key[1].bit_length()
                 encryption_details = {
-                    "algorithm": "RSA (Educational)",
-                    "key_size": "Small primes (demo)",
-                    "public_exponent": "Random prime",
-                    "private_exponent": str(key[0]),
-                    "modulus": str(key[1]),
+                    "algorithm": "RSA (Block-based)",
+                    "key_size": f"{n_bits}-bit modulus",
+                    "public_exponent": "65537",
+                    "private_exponent": str(key[0])[:50] + "..." if len(str(key[0])) > 50 else str(key[0]),
+                    "modulus": str(key[1])[:50] + "..." if len(str(key[1])) > 50 else str(key[1]),
+                    "block_size": f"{block_size} bytes",
                     "rounds": 1,
-                    "mode": "Byte-by-byte encryption"
+                    "mode": f"Block encryption ({block_size * 8}-bit blocks)"
                 }
+                key_info = f"d={str(key[0])[:20]}..., n={str(key[1])[:20]}..., block_size={block_size}"
+            else:  # AES
+                encryption_details = {
+                    "algorithm": "AES-128",
+                    "key_size": "128-bit",
+                    "mode": "CBC (Cipher Block Chaining)",
+                    "block_size": "16 bytes",
+                    "rounds": 10,
+                    "key_value": key[0].hex()[:32] + "...",
+                    "iv_value": key[1].hex()[:32] + "...",
+                    "padding": "PKCS7"
+                }
+                key_info = f"Key: {key[0].hex()[:32]}..., IV: {key[1].hex()[:32]}..."
             
             result = {
                 "success": True,
                 "output_path": compiled_path,
-                "encryption_type": ["XOR", "RSA"][option-1],
+                "encryption_type": ["XOR", "RSA", "AES"][option-1],
                 "original_size": len(raw),
                 "encrypted_size": len(enc),
                 "size_difference": size_diff,
                 "size_ratio": f"{size_ratio:.2f}%",
-                "key_info": f"Key: {key[0]}" if option == 1 else f"d={key[0]}, n={key[1]}",
+                "key_info": key_info,
                 "encryption_details": encryption_details,
                 "loader_type": "Self-extracting ELF",
                 "loader_method": "tmpfs + execv",
-                "bytes_encrypted": len(enc),
+                "bytes_encrypted": len(raw),  # Original bytes encrypted
+                "ciphertext_size": len(enc),  # Actual encrypted output size
                 "entropy_increased": True,
                 "platform": "Linux ELF (x86_64)",
                 "compiler": "GCC",
@@ -283,15 +320,15 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Binary Obfuscator')
     parser.add_argument('input_file', help='Input binary file to obfuscate')
-    parser.add_argument('-t', '--type', required=True, choices=['xor', 'rsa'], 
-                        help='Encryption type (xor or rsa)')
+    parser.add_argument('-t', '--type', required=True, choices=['xor', 'rsa', 'aes'], 
+                        help='Encryption type (xor, rsa, or aes)')
     parser.add_argument('-o', '--output', required=True, 
                         help='Output path for obfuscated binary')
     
     args = parser.parse_args()
     
     # Map encryption type to option number
-    encryption_map = {'xor': 1, 'rsa': 2}
+    encryption_map = {'xor': 1, 'rsa': 2, 'aes': 3}
     option = encryption_map[args.type.lower()]
     
     print(f"[+] Input file: {args.input_file}")
