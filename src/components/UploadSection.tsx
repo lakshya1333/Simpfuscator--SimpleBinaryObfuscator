@@ -30,22 +30,24 @@ const UploadSection = ({ onFileUploaded }: { onFileUploaded?: (file: File) => vo
   }, []);
 
   const validateFile = (file: File) => {
-    const validExtensions = [".exe", ".dll"];
-    const fileExtension = file.name.substring(file.name.lastIndexOf("."));
+    // For ELF files, we'll do lenient client-side validation
+    // The server will perform strict ELF magic number validation
     
-    if (!validExtensions.includes(fileExtension.toLowerCase())) {
+    // Check file size limit
+    if (file.size > 100 * 1024 * 1024) { // 100MB limit
       toast({
-        title: "Invalid file type",
-        description: "Please upload a .exe or .dll file",
+        title: "File too large",
+        description: "Maximum file size is 100MB",
         variant: "destructive",
       });
       return false;
     }
 
-    if (file.size > 100 * 1024 * 1024) { // 100MB limit
+    // Check minimum file size (ELF files should be at least a few bytes)
+    if (file.size < 4) {
       toast({
-        title: "File too large",
-        description: "Maximum file size is 100MB",
+        title: "Invalid file",
+        description: "File is too small to be a valid ELF binary",
         variant: "destructive",
       });
       return false;
@@ -133,12 +135,12 @@ const UploadSection = ({ onFileUploaded }: { onFileUploaded?: (file: File) => vo
 
           <div>
             <h3 className="text-xl font-semibold mb-2">
-              {uploadedFile ? "File Ready" : "Drop your binary here"}
+              {uploadedFile ? "File Ready" : "Drop your ELF binary here"}
             </h3>
             <p className="text-muted-foreground">
               {uploadedFile
                 ? "Your file is ready for obfuscation"
-                : "Support for .exe and .dll files (max 100MB)"}
+                : "Support for Linux ELF binaries (any name, max 100MB)"}
             </p>
           </div>
 
@@ -148,7 +150,6 @@ const UploadSection = ({ onFileUploaded }: { onFileUploaded?: (file: File) => vo
                 type="file"
                 id="file-upload"
                 className="hidden"
-                accept=".exe,.dll"
                 onChange={handleFileInput}
               />
               <Button

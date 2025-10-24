@@ -46,9 +46,6 @@ const Dashboard = () => {
   const encryptionOptions = [
     { value: "xor", label: "XOR Encryption", description: "Fast bitwise operation encryption" },
     { value: "rsa", label: "RSA Encryption", description: "Public-key cryptography algorithm" },
-    { value: "aes", label: "AES Encryption", description: "Advanced Encryption Standard (256-bit)" },
-    { value: "rc4", label: "RC4 Encryption", description: "Stream cipher encryption" },
-    { value: "des", label: "DES Encryption", description: "Data Encryption Standard" },
   ];
 
   const startObfuscation = async () => {
@@ -118,7 +115,17 @@ const Dashboard = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        
+        // Build detailed error message
+        let errorMsg = errorData.message || errorData.error || `Server error: ${response.status}`;
+        if (errorData.details) {
+          errorMsg += `\n\nDetails: ${errorData.details}`;
+        }
+        if (errorData.hint) {
+          errorMsg += `\n\n💡 ${errorData.hint}`;
+        }
+        
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
@@ -208,7 +215,7 @@ const Dashboard = () => {
               <RadioGroup
                 value={selectedEncryption || ""}
                 onValueChange={(value) => setSelectedEncryption(value as EncryptionType)}
-                className="grid grid-cols-2 md:grid-cols-5 gap-2"
+                className="grid grid-cols-1 md:grid-cols-2 gap-3"
               >
                 {encryptionOptions.map((option) => (
                   <div
@@ -400,22 +407,138 @@ const Dashboard = () => {
 
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">Key Size</CardTitle>
+                <CardTitle className="text-sm text-muted-foreground">Original Size</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-lg font-semibold">
-                  {obfuscationData.keySize || "N/A"}
+                  {obfuscationData.originalSize 
+                    ? `${(obfuscationData.originalSize / 1024).toFixed(2)} KB` 
+                    : "N/A"}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">Algorithm Rounds</CardTitle>
+                <CardTitle className="text-sm text-muted-foreground">Encrypted Size</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-lg font-semibold">
-                  {obfuscationData.rounds || "N/A"}
+                  {obfuscationData.encryptedSize 
+                    ? `${(obfuscationData.encryptedSize / 1024).toFixed(2)} KB` 
+                    : "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Size Change</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-semibold">
+                  {obfuscationData.size_ratio || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Algorithm</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm font-semibold">
+                  {obfuscationData.encryption_details?.algorithm || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Key Size</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-semibold">
+                  {obfuscationData.encryption_details?.key_size || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Loader Type</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm font-semibold">
+                  {obfuscationData.loader_type || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Platform</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm font-semibold">
+                  {obfuscationData.platform || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Compiler</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-semibold">
+                  {obfuscationData.compiler || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Optimization</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-semibold">
+                  {obfuscationData.optimization || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Encryption Mode</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm font-semibold">
+                  {obfuscationData.encryption_details?.mode || "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Bytes Encrypted</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-semibold">
+                  {obfuscationData.bytes_encrypted 
+                    ? obfuscationData.bytes_encrypted.toLocaleString() 
+                    : "N/A"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm text-muted-foreground">Loader Method</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm font-semibold">
+                  {obfuscationData.loader_method || "N/A"}
                 </p>
               </CardContent>
             </Card>
@@ -436,9 +559,11 @@ const Dashboard = () => {
             <CardTitle className="text-sm">Info</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>• Supported formats: .exe, .dll</p>
+            <p>• Supported format: ELF binaries (Linux executables)</p>
             <p>• Maximum file size: 100MB</p>
-            <p>• Encryption: AES-256-GCM</p>
+            <p>• Encryption: XOR or RSA</p>
+            <p>• Digital signature: RSA-PSS 2048-bit</p>
+            <p>• Loader: Self-extracting with tmpfs</p>
           </CardContent>
         </Card>
       </motion.div>

@@ -41,14 +41,9 @@ const upload = multer({
     fileSize: 100 * 1024 * 1024 // 100MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedExtensions = ['.exe', '.dll'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    
-    if (allowedExtensions.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only .exe and .dll files are allowed'));
-    }
+    // Accept all files - we'll validate ELF magic number after upload
+    // This allows files with any extension or no extension
+    cb(null, true);
   }
 });
 
@@ -112,6 +107,35 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Encryption type is required' });
     }
 
+    // Read file to validate ELF format and for signature verification
+    const fileBuffer = fs.readFileSync(req.file.path);
+    
+    // Validate ELF magic number (0x7F 'E' 'L' 'F')
+    if (fileBuffer.length < 4 || 
+        fileBuffer[0] !== 0x7F || 
+        fileBuffer[1] !== 0x45 || 
+        fileBuffer[2] !== 0x4C || 
+        fileBuffer[3] !== 0x46) {
+      
+      // Show what we got for debugging
+      const magicBytes = fileBuffer.slice(0, 4);
+      const magicHex = Array.from(magicBytes).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+      
+      console.error('❌ Invalid file format - not an ELF binary');
+      console.error(`   Expected: 0x7f 0x45 0x4c 0x46 (ELF magic number)`);
+      console.error(`   Got: ${magicHex}`);
+      
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ 
+        error: 'Invalid file format',
+        message: 'Only ELF binary files are supported. File must start with ELF magic number (0x7F454C46).',
+        details: `File starts with: ${magicHex}, expected: 0x7f 0x45 0x4c 0x46`,
+        hint: 'Make sure you are uploading a Linux ELF executable or shared library, not a Windows PE file (.exe/.dll) or other format.'
+      });
+    }
+    
+    console.log('✓ Valid ELF binary detected');
+
     // Verify digital signature if provided
     if (signature && publicKey) {
       console.log('Verifying digital signature...');
@@ -119,7 +143,6 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
       console.log('Signature length:', signature.length);
       console.log('File size:', req.file.size);
       
-      const fileBuffer = fs.readFileSync(req.file.path);
       const isValid = verifySignature(publicKey, signature, fileBuffer);
       
       if (!isValid) {
@@ -141,7 +164,7 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
       if (!publicKey) console.log('  - Missing public key');
     }
 
-    const validEncryptionTypes = ['xor', 'rsa', 'aes', 'rc4', 'des'];
+    const validEncryptionTypes = ['xor', 'rsa'];
     if (!validEncryptionTypes.includes(encryptionType.toLowerCase())) {
       return res.status(400).json({ 
         error: 'Invalid encryption type',
@@ -159,8 +182,10 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
     console.log(`Output path: ${outputPath}`);
 
     // Call Python obfuscator script
-    // subprocess.run(['python3', 'obfuscator.py', inputPath, '-t', encryptionType, '-o', outputPath])
-    const pythonProcess = spawn('python3', [
+    // On Windows, use 'python' instead of 'python3'
+    const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+    
+    const pythonProcess = spawn(pythonCommand, [
       path.join(__dirname, 'obfuscator.py'),
       inputPath,
       '-t', encryptionType,
@@ -186,14 +211,28 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
       if (code !== 0) {
         console.error(`Python process exited with code ${code}`);
         console.error(`stderr: ${stderr}`);
+        console.error(`stdout: ${stdout}`);
         
         // Clean up uploaded file
         fs.unlinkSync(inputPath);
         
+        // Check if it's a Windows environment error
+        let errorMessage = 'Obfuscation failed';
+        let errorDetails = stderr || stdout || 'Unknown error occurred';
+        
+        if (stdout.includes('ERROR: Simpfuscator cannot run natively on Windows')) {
+          errorMessage = 'Windows environment not supported';
+          errorDetails = 'Simpfuscator requires a Linux environment to generate ELF binaries. Please run the backend using Docker (recommended) or WSL. See DOCKER_SETUP.md or WINDOWS_SETUP.md for detailed instructions.';
+        } else if (stderr.includes('sys/wait.h: No such file or directory')) {
+          errorMessage = 'Windows environment detected';
+          errorDetails = 'Cannot compile Linux ELF binaries on Windows. Please use Docker (easiest) or WSL. See DOCKER_SETUP.md for setup instructions.';
+        }
+        
         return res.status(500).json({
-          error: 'Obfuscation failed',
-          details: stderr || 'Unknown error occurred',
-          exitCode: code
+          error: errorMessage,
+          details: errorDetails,
+          exitCode: code,
+          hint: 'Easiest solution: docker-compose up --build (see DOCKER_SETUP.md)'
         });
       }
 
@@ -204,6 +243,7 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
         const jsonMatch = stdout.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           debugInfo = JSON.parse(jsonMatch[0]);
+          console.log('Parsed debug info:', debugInfo);
         }
       } catch (e) {
         console.log('Could not parse debug info from Python output');
@@ -215,13 +255,15 @@ app.post('/api/obfuscate', upload.single('file'), async (req, res) => {
         message: 'Obfuscation completed successfully',
         fileUrl: `/api/download/${outputFilename}`,
         downloadUrl: `/api/download/${outputFilename}`,
-        encryptionType: encryptionType,
-        encryptionKey: debugInfo.encryptionKey || 'Generated dynamically',
-        sectionsEncrypted: debugInfo.sectionsEncrypted || Math.floor(Math.random() * 10) + 1,
+        encryptionType: debugInfo.encryption_type || encryptionType.toUpperCase(),
+        encryptionKey: debugInfo.key_info || 'Generated dynamically',
+        sectionsEncrypted: 1, // Single binary encryption
         processingTime: `${processingTime}s`,
         originalFile: req.file.originalname,
         obfuscatedFile: outputFilename,
         fileSize: req.file.size,
+        originalSize: debugInfo.original_size || req.file.size,
+        encryptedSize: debugInfo.encrypted_size || req.file.size,
         signatureVerified: !!(signature && publicKey), // Indicate if signature was verified
         // Add any additional debug info from your Python script
         ...debugInfo
