@@ -242,9 +242,9 @@ void decrypt_aes(unsigned char *data, size_t len, unsigned char *key, unsigned c
 }"""
 
 def encrypt_xor(shellcode : bytes):
-    key = [random.randint(0x1, 0xff), 0]
-    enc = bytes(a ^ key[0] for a in shellcode)
-    return enc, key
+    key_value = random.randint(0x1, 0xff)
+    enc = bytes(a ^ key_value for a in shellcode)
+    return enc, (key_value,)  # Return as tuple for consistency
 
 def encrypt_rsa(shellcode : bytes):
     # Use larger primes for block-based RSA

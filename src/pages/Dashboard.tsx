@@ -189,7 +189,7 @@ const Dashboard = () => {
           Simpfuscator Dashboard
         </h1>
         <p className="text-muted-foreground">
-          Upload and obfuscate your Windows PE binaries
+          Upload and obfuscate your Linux ELF binaries
         </p>
       </motion.div>
 
@@ -216,7 +216,7 @@ const Dashboard = () => {
               <RadioGroup
                 value={selectedEncryption || ""}
                 onValueChange={(value) => setSelectedEncryption(value as EncryptionType)}
-                className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                className="grid grid-cols-1 md:grid-cols-3 gap-3"
               >
                 {encryptionOptions.map((option) => (
                   <div

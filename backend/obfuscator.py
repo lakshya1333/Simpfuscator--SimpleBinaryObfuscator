@@ -106,11 +106,13 @@ class Obfuscator:
         raw = open(self.filename, 'rb').read()
         enc, key = self.encryptions[option-1](raw) 
 
-        func_sign = {
-            1 : f'decrypt_xor(elf_bytes, elf_len, {key[0]})',
-            2 : f'decrypt_rsa(elf_bytes, elf_len, {key[0]}, {key[1]}, {key[2]})',  # d, n, block_size
-            3 : f'decrypt_aes(elf_bytes, elf_len, aes_key, aes_iv)'  # AES key and IV
-        }
+        # Generate function signature based on encryption type
+        if option == 1:  # XOR
+            func_sign = f'decrypt_xor(elf_bytes, elf_len, {key[0]})'
+        elif option == 2:  # RSA
+            func_sign = f'decrypt_rsa(elf_bytes, elf_len, {key[0]}, {key[1]}, {key[2]})'
+        else:  # AES
+            func_sign = f'decrypt_aes(elf_bytes, elf_len, aes_key, aes_iv)'
         
         # For RSA and AES, the decrypted length should be the original length
         # For XOR, encrypted and decrypted lengths are the same
@@ -148,7 +150,7 @@ size_t decrypted_len = {decrypted_len};
 static unsigned char elf_bytes[] = {bytes_to_c_array(enc)};
 
 int main() {{
-    {func_sign[option]};
+    {func_sign};
 
     char tmpl[] = "/tmp/genelfXXXXXX";
     int fd = mkstemp(tmpl);
